@@ -1,10 +1,10 @@
 import os
-import pickle
+import requests
+from io import BytesIO
 from PIL import Image, ImageEnhance, ImageOps
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import pickle
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
@@ -17,8 +17,10 @@ from sklearn.metrics import classification_report, accuracy_score
 import warnings
 warnings.filterwarnings('ignore')
 
-# Path to dataset
-data_path = "C:/Users/Kavya/data"
+# GitHub base URL for your data
+github_base_url = "https://github.com/kavyasri2099/Satellite_app/raw/main"
+
+# Categories in the dataset
 categories = ["cloudy", "desert", "green_area", "water"]
 
 # Function to augment images
@@ -32,14 +34,19 @@ def augment_image(image):
 def convert_to_grayscale(image):
     return ImageOps.grayscale(image)
 
-def process_images(data_path, categories):
-    images, labels = [], []
+def download_and_process_images(github_base_url, categories):
+    images, labels = []
     for category in categories:
-        category_path = os.path.join(data_path, category)
+        category_url = f"{github_base_url}/{category}"
+        response = requests.get(category_url)
+        response.raise_for_status()
+        category_files = response.json()
+
         label = categories.index(category)
-        for img_name in os.listdir(category_path):
-            img_path = os.path.join(category_path, img_name)
-            img = Image.open(img_path)
+        for img_name in category_files:
+            img_url = f"{category_url}/{img_name}"
+            img_response = requests.get(img_url)
+            img = Image.open(BytesIO(img_response.content))
             img = img.resize((128, 128))
             img = augment_image(img)
             img = convert_to_grayscale(img)
@@ -48,7 +55,7 @@ def process_images(data_path, categories):
             labels.append(label)
     return np.array(images), np.array(labels)
 
-images, labels = process_images(data_path, categories)
+images, labels = download_and_process_images(github_base_url, categories)
 
 # Save processed images to CSV
 df = pd.DataFrame(images)
