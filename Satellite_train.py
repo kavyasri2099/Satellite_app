@@ -88,7 +88,11 @@ for model_name, model in models.items():
 
     with open(f'{model_name}_model.pkl', 'wb') as f:
         pickle.dump(model, f)
+        print(f"Saved {model_name}_model.pkl")
 
 # Save the preprocessing pipeline
 with open('preprocessing_pipeline.pkl', 'wb') as f:
     pickle.dump(preprocessing_pipeline, f)
+    print("Saved preprocessing_pipeline.pkl")
+
+print("Training script has been successfully completed. You can now run app.py.")
