@@ -2,6 +2,9 @@ import streamlit as st
 import pickle
 import numpy as np
 from PIL import Image, ImageOps
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 
 # Function to preprocess the uploaded image
 def preprocess_image(image):
@@ -10,12 +13,10 @@ def preprocess_image(image):
     image = np.array(image).flatten()
     return image
 
-# Load all models
+# Load the models
 model_paths = {
     'Random Forest': 'rf_best_model.pkl',
     'KNN': 'knn_best_model.pkl',
-    'Decision Tree': 'dt_best_model.pkl',
-    'Naive Bayes': 'nb_best_model.pkl',
     'Logistic Regression': 'lr_best_model.pkl'
 }
 
@@ -39,7 +40,7 @@ if uploaded_file is not None:
     # Preprocess the image
     processed_image = preprocess_image(image).reshape(1, -1)
 
-    # Display predictions from each model
+    # Display predictions
     for model_name, model in models.items():
         prediction = model.predict(processed_image)
         st.write(f"{model_name} Prediction: {prediction[0]}")
