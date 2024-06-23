@@ -1,118 +1,94 @@
 import os
 import numpy as np
 import pandas as pd
-from PIL import Image, ImageOps, ImageEnhance
+from PIL import Image, ImageOps
+import warnings
 import pickle
-from sklearn.model_selection import train_test_split, GridSearchCV
+import time
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, accuracy_score
 
-# Path to your dataset folders directly containing images
-cloudy_path = "cloudy"
-desert_path = "desert"
-green_area_path = "green_area"
-water_path = "water"
+warnings.filterwarnings('ignore')
 
-# Function to load and preprocess images
-def load_and_preprocess_images(paths):
+# Path to dataset
+data_path = "./"
+
+# Categories in the dataset
+categories = ["cloudy", "desert", "green_area", "water"]
+
+# Augmentation function
+def augment_image(image):
+    angle = np.random.uniform(-20, 20)  # Random rotation
+    image = image.rotate(angle)
+    if np.random.rand() > 0.5:  # Random horizontal flip
+        image = ImageOps.mirror(image)
+    return image
+
+# Convert to grayscale function
+def convert_to_grayscale(image):
+    return ImageOps.grayscale(image)
+
+# Process images and save to CSV
+def process_and_save_images(data_path, categories):
     images = []
     labels = []
+    for category in categories:
+        category_path = os.path.join(data_path, category)
+        label = categories.index(category)
+        for img_name in os.listdir(category_path):
+            img_path = os.path.join(category_path, img_name)
+            img = Image.open(img_path)
+            img = img.resize((128, 128))  # Resize images to a standard size
+            img = augment_image(img)  # Augmentation
+            img = convert_to_grayscale(img)  # Convert to grayscale
+            img_array = np.array(img).flatten()
+            images.append(img_array)
+            labels.append(label)
+    images = np.array(images)
+    labels = np.array(labels)
+    return images, labels
 
-    for category_id, path in enumerate(paths):
-        for file_name in os.listdir(path):
-            image_path = os.path.join(path, file_name)
-            image = Image.open(image_path)
-            image = image.resize((128, 128))  # Resize images to a standard size
+images, labels = process_and_save_images(data_path, categories)
 
-            # Data augmentation: random rotation and horizontal flip
-            angle = np.random.uniform(-20, 20)
-            image = image.rotate(angle)
-            if np.random.rand() > 0.5:
-                image = ImageOps.mirror(image)
-
-            # Convert to grayscale
-            image = ImageOps.grayscale(image)
-
-            # Convert image to numpy array and flatten
-            image_array = np.array(image).flatten()
-
-            # Append image array and label to lists
-            images.append(image_array)
-            labels.append(category_id)
-
-    return np.array(images), np.array(labels)
-
-# Load and preprocess images
-images, labels = load_and_preprocess_images([cloudy_path, desert_path, green_area_path, water_path])
-
-# Save preprocessed images and labels to CSV
-df = pd.DataFrame(images)
-df['label'] = labels
-df.to_csv("satellite_images.csv", index=False)
-
-# Split dataset into training and testing sets
+# Split the dataset
 X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
-# Define preprocessing pipeline
+# Preprocessing pipeline
 preprocessing_pipeline = Pipeline([
     ('scaler', StandardScaler())
 ])
 
-# Apply preprocessing pipeline to training and testing sets
 X_train = preprocessing_pipeline.fit_transform(X_train)
 X_test = preprocessing_pipeline.transform(X_test)
 
-# Define models
+# Train and save models
 models = {
-    'Random Forest': RandomForestClassifier(),
-    'KNN': KNeighborsClassifier(),
-    'Decision Tree': DecisionTreeClassifier(),
-    'Naive Bayes': GaussianNB(),
-    'Logistic Regression': LogisticRegression(max_iter=1000)
+    "Random Forest": RandomForestClassifier(n_estimators=100, max_features='sqrt'),
+    "Decision Tree": DecisionTreeClassifier(),
+    "K-Nearest Neighbors": KNeighborsClassifier(),
+    "Support Vector Machine": SVC(kernel='linear')
 }
 
-# Train models and evaluate performance
 for model_name, model in models.items():
-    print(f"Training {model_name}...")
+    start_time = time.time()
     model.fit(X_train, y_train)
+    end_time = time.time()
     y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"{model_name} Accuracy: {accuracy:.4f}")
+
+    print(f"{model_name} Model")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
     print(classification_report(y_test, y_pred))
-    print()
+    print(f"Training time: {end_time - start_time} seconds\n")
 
-    # Save the best model using pickle
-    pickle.dump(model, open(f"{model_name.lower().replace(' ', '_')}_model.pkl", 'wb'))
+    with open(f'{model_name.lower().replace(" ", "_")}_model.pkl', 'wb') as f:
+        pickle.dump(model, f)
 
-    # Plot confusion matrix
-    cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(5, 4))
-    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', cbar=False)
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.title(f'Confusion Matrix - {model_name}')
-    plt.savefig(f"confusion_matrix_{model_name.lower().replace(' ', '_')}.png")
-    plt.show()
-
-    # Clear plot to avoid overlapping in loop
-    plt.clf()
-
-# Save preprocessing pipeline using pickle
-pickle.dump(preprocessing_pipeline, open('preprocessing_pipeline.pkl', 'wb'))
-
-# Visualize count plot of categories
-sns.countplot(x=labels, palette="viridis")
-plt.xticks(ticks=np.arange(4), labels=['cloudy', 'desert', 'green_area', 'water'])
-plt.xlabel('Category')
-plt.ylabel('Count')
-plt.title('Distribution of Satellite Image Categories')
-plt.savefig('count_plot.png')
-plt.show()
+# Save the preprocessing pipeline
+with open('preprocessing_pipeline.pkl', 'wb') as f:
+    pickle.dump(preprocessing_pipeline, f)
