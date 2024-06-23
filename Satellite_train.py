@@ -69,10 +69,10 @@ X_test = preprocessing_pipeline.transform(X_test)
 
 # Train and save models
 models = {
-    "Random Forest": RandomForestClassifier(n_estimators=100, max_features='sqrt'),
-    "Decision Tree": DecisionTreeClassifier(),
-    "K-Nearest Neighbors": KNeighborsClassifier(),
-    "Support Vector Machine": SVC(kernel='linear')
+    "random_forest": RandomForestClassifier(n_estimators=100, max_features='sqrt'),
+    "decision_tree": DecisionTreeClassifier(),
+    "k_nearest_neighbors": KNeighborsClassifier(),
+    "support_vector_machine": SVC(kernel='linear')
 }
 
 for model_name, model in models.items():
@@ -81,12 +81,12 @@ for model_name, model in models.items():
     end_time = time.time()
     y_pred = model.predict(X_test)
 
-    print(f"{model_name} Model")
+    print(f"{model_name.replace('_', ' ').title()} Model")
     print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
     print(classification_report(y_test, y_pred))
     print(f"Training time: {end_time - start_time} seconds\n")
 
-    with open(f'{model_name.lower().replace(" ", "_")}_model.pkl', 'wb') as f:
+    with open(f'{model_name}_model.pkl', 'wb') as f:
         pickle.dump(model, f)
 
 # Save the preprocessing pipeline
