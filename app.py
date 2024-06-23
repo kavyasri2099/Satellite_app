@@ -1,55 +1,62 @@
 import streamlit as st
-import pickle
+from PIL import Image, ImageOps
 import numpy as np
+import os
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+import pickle
 
-# Set page configuration
-st.set_page_config(layout="wide")
+# Load your trained model
+@st.cache(allow_output_mutation=True)
+def load_model():
+    with open("best_model.pkl", "rb") as file:
+        model = pickle.load(file)
+    return model
 
-# Function to load model from local file
-def load_model(file_path):
-    with open(file_path, 'rb') as file:
-        try:
-            model = pickle.load(file)
-            return model
-        except Exception as e:
-            st.error(f"Error loading model {file_path}: {e}")
-            return None
+# Load the model
+model = load_model()
 
-# Model file paths
-model_files = {
-    "Random Forest": "random_forest_model.pkl",
-    "KNN": "knn_model.pkl",
-    "Decision Tree": "decision_tree_model.pkl",
-    "Naive Bayes": "naive_bayes_model.pkl",
-    "Logistic Regression": "logistic_regression_model.pkl"
-}
+# Preprocess the image
+def preprocess_image(image):
+    image = image.resize((128, 128))  # Resize to match the training size
+    image = ImageOps.grayscale(image)  # Convert to grayscale
+    image = np.array(image).flatten()  # Flatten the image
+    image = np.expand_dims(image, axis=0)  # Add batch dimension
+    return image
 
-# Load models
-models = {name: load_model(file) for name, file in model_files.items()}
-
-# Filter out None values
-models = {name: model for name, model in models.items() if model is not None}
-
-# Streamlit app
+# Display the title and description
 st.title("Satellite Image Classification")
+st.write("Upload a satellite image, and the model will predict its category.")
 
-# Check if models are loaded successfully
-if not models:
-    st.error("No models could be loaded.")
-else:
-    # Select model
-    model_name = st.sidebar.selectbox("Select Model", list(models.keys()))
+# File uploader
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
-    # Load selected model
-    model = models[model_name]
+if uploaded_file is not None:
+    # Load and display the image
+    image = Image.open(uploaded_file)
+    st.image(image, caption='Uploaded Image', use_column_width=True)
+    
+    # Preprocess the image
+    processed_image = preprocess_image(image)
+    
+    # Standardize the image
+    scaler = StandardScaler()
+    processed_image = scaler.fit_transform(processed_image)
+    
+    # Predict the category
+    categories = ["cloudy", "desert", "green_area", "water"]
+    prediction = model.predict(processed_image)
+    predicted_category = categories[prediction[0]]
+    
+    # Display the prediction
+    st.write(f"The model predicts this image is: **{predicted_category}**")
 
-    # Define a dummy input for prediction (as an example)
-    features = np.random.rand(1, 18)
-
-    # Button to make prediction
-    if st.button("Predict"):
-        prediction = model.predict(features)
-        st.write(f"Prediction: {prediction[0]}")
-
-if __name__ == '__main__':
-    st.title("Satellite Image Classification App")
+# Plotting the distribution of categories (if desired)
+if st.checkbox("Show category distribution"):
+    # Assuming you saved the DataFrame with images and labels
+    df = pd.read_csv("satellite_images.csv")
+    
+    # Display the count plot
+    st.subheader("Category Distribution in the Dataset")
+    st.bar_chart(df['label'].value_counts())
