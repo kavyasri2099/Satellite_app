@@ -1,29 +1,25 @@
 import streamlit as st
-import requests
 import pickle
 import numpy as np
+import os
 
-# Function to load model from GitHub
-def load_model_from_github(url):
-    response = requests.get(url)
-    response.raise_for_status()
-    model = pickle.loads(response.content)
+# Function to load model from local file
+def load_model(file_path):
+    with open(file_path, 'rb') as file:
+        model = pickle.load(file)
     return model
 
-# GitHub repository base URL for model files
-base_url = "https://github.com/kavyasri2099/Satellite_app/main/"
-
-# Model file URLs
-model_urls = {
-    "Random Forest": base_url + "random_forest_model.pkl",
-    "KNN": base_url + "knn_model.pkl",
-    "Decision Tree": base_url + "decision_tree_model.pkl",
-    "Naive Bayes": base_url + "naive_bayes_model.pkl",
-    "Logistic Regression": base_url + "logistic_regression_model.pkl"
+# Model file paths
+model_files = {
+    "Random Forest": "random_forest_model.pkl",
+    "KNN": "knn_model.pkl",
+    "Decision Tree": "decision_tree_model.pkl",
+    "Naive Bayes": "naive_bayes_model.pkl",
+    "Logistic Regression": "logistic_regression_model.pkl"
 }
 
 # Load models
-models = {name: load_model_from_github(url) for name, url in model_urls.items()}
+models = {name: load_model(file) for name, file in model_files.items()}
 
 # Streamlit app
 st.title("Satellite Image Classification")
