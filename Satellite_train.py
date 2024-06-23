@@ -1,115 +1,165 @@
 import os
-from PIL import Image, ImageOps
+import pickle
+from PIL import Image, ImageEnhance, ImageOps
 import numpy as np
 import pandas as pd
-import pickle
-from sklearn.model_selection import train_test_split, GridSearchCV
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, accuracy_score
-import warnings
-warnings.filterwarnings('ignore')
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# Import PyGithub
+from github import Github
+
+# Path to your dataset
+data_path = "C:/Users/Lenovo/data1"
 
 # Categories in the dataset
 categories = ["cloudy", "desert", "green_area", "water"]
 
-# Function to augment images
+# Function to augment image
 def augment_image(image):
-    angle = np.random.uniform(-20, 20)
+    angle = np.random.uniform(-20, 20)  # Random rotation
     image = image.rotate(angle)
-    if np.random.rand() > 0.5:
+    
+    if np.random.rand() > 0.5:  # Random horizontal flip
         image = ImageOps.mirror(image)
+    
     return image
 
+# Function to adjust brightness
+def adjust_brightness(image, factor):
+    enhancer = ImageEnhance.Brightness(image)
+    return enhancer.enhance(factor)
+
+# Function to convert to grayscale
 def convert_to_grayscale(image):
     return ImageOps.grayscale(image)
 
-def process_images(data_path, categories):
-    images, labels = [], []
+# Function to process and save images to CSV
+def process_and_save_images(data_path, categories):
+    images = []
+    labels = []
+
     for category in categories:
         category_path = os.path.join(data_path, category)
         label = categories.index(category)
+        
         for img_name in os.listdir(category_path):
             img_path = os.path.join(category_path, img_name)
             img = Image.open(img_path)
-            img = img.resize((128, 128))
-            img = augment_image(img)
-            img = convert_to_grayscale(img)
+            img = img.resize((128, 128))  # Resize images to a standard size
+            
+            img = augment_image(img)  # Augmentation
+            img = convert_to_grayscale(img)  # Convert to grayscale
             img_array = np.array(img).flatten()
+
             images.append(img_array)
             labels.append(label)
-    return np.array(images), np.array(labels)
 
-# Data path where the folders are located
-data_path = "."
+    images = np.array(images)
+    labels = np.array(labels)
 
-# Process images
-images, labels = process_images(data_path, categories)
+    df = pd.DataFrame(images)  # Save to CSV
+    df['label'] = labels
+    df.to_csv("satellite_images.csv", index=False)
 
-# Check if any images were processed
-if images.size == 0 or labels.size == 0:
-    raise ValueError("No images or labels were processed.")
+    return images, labels
 
-# Save processed images to CSV
-df = pd.DataFrame(images)
-df['label'] = labels
-df.to_csv("satellite_images.csv", index=False)
+# Load and process images
+images, labels = process_and_save_images(data_path, categories)
+
+# Define models globally
+models = {
+    "Random Forest": RandomForestClassifier(),
+    "KNN": KNeighborsClassifier(),
+    "Decision Tree": DecisionTreeClassifier(),
+    "Naive Bayes": GaussianNB(),
+    "Logistic Regression": LogisticRegression(max_iter=1000)
+}
+
+# Function to train and evaluate models
+def train_and_evaluate_models(X_train, X_test, y_train, y_test):
+    results = {}
+
+    for name, model in models.items():
+        print(f"Training {name}...")
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        report = classification_report(y_test, y_pred)
+        confusion = confusion_matrix(y_test, y_pred)
+        
+        results[name] = {
+            "accuracy": accuracy,
+            "classification_report": report,
+            "confusion_matrix": confusion
+        }
+        print(f"{name} - Accuracy: {accuracy:.4f}")
+
+    return results
 
 # Split dataset
 X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
-# Preprocessing pipeline
-preprocessing_pipeline = Pipeline([('scaler', StandardScaler())])
+# Preprocess data
+preprocessing_pipeline = Pipeline([
+    ('scaler', StandardScaler())
+])
+
 X_train = preprocessing_pipeline.fit_transform(X_train)
 X_test = preprocessing_pipeline.transform(X_test)
 
-# Train and save models
-models = {
-    "RandomForest": RandomForestClassifier(),
-    "KNN": KNeighborsClassifier(),
-    "DecisionTree": DecisionTreeClassifier(),
-    "NaiveBayes": GaussianNB(),
-    "LogisticRegression": LogisticRegression(max_iter=1000)
-}
+# Train and evaluate models
+results = train_and_evaluate_models(X_train, X_test, y_train, y_test)
 
-params = {
-    "RandomForest": {'n_estimators': [50, 100, 200], 'max_features': ['auto', 'sqrt', 'log2']},
-    "KNN": {'n_neighbors': [3, 5, 7], 'weights': ['uniform', 'distance'], 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute']},
-    "DecisionTree": {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 'max_depth': [None, 10, 20, 30]},
-    "LogisticRegression": {'C': [0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
-}
+# Print and visualize results
+print("\nModel Evaluation Results:")
+for name, result in results.items():
+    print(f"\n{name}:")
+    print(f"Accuracy: {result['accuracy']:.4f}")
+    print("Classification Report:")
+    print(result['classification_report'])
+    print("Confusion Matrix:")
+    print(result['confusion_matrix'])
 
-best_accuracy = 0
-best_model_name = ""
-best_model = None
-
-for model_name in models:
-    print(f"Training {model_name}...")
-    if model_name in params:
-        grid_search = GridSearchCV(models[model_name], params[model_name], cv=3, verbose=1)
-        grid_search.fit(X_train, y_train)
-        model = grid_search.best_estimator_
-    else:
-        models[model_name].fit(X_train, y_train)
-        model = models[model_name]
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"{model_name} Accuracy: {accuracy}")
-    print(classification_report(y_test, y_pred))
-    with open(f"{model_name.lower()}_model.pkl", 'wb') as f:
+# Save models as .pkl files
+model_files = {}
+for name, model in models.items():
+    filename = f"{name.lower().replace(' ', '_')}_model.pkl"
+    with open(filename, 'wb') as f:
         pickle.dump(model, f)
-    if accuracy > best_accuracy:
-        best_accuracy = accuracy
-        best_model_name = model_name
-        best_model = model
+    model_files[name] = filename
 
-print(f"Best model: {best_model_name} with accuracy {best_accuracy}")
+# Commit files to GitHub repository
+def commit_to_github(repo_path, github_token, model_files):
+    # Initialize GitHub instance
+    g = Github(github_token)
+    repo = g.get_repo(repo_path)
+    
+    # Add and commit each .pkl file
+    for model_name, file_path in model_files.items():
+        file_content = open(file_path, 'rb').read()
+        try:
+            # Check if the file exists
+            contents = repo.get_contents(file_path)
+            repo.update_file(contents.path, f"Update {model_name} model", file_content, contents.sha)
+            print(f"Updated {model_name} model on GitHub.")
+        except Exception as e:
+            # File doesn't exist, create a new file
+            repo.create_file(file_path, f"Add {model_name} model", file_content)
+            print(f"Added {model_name} model to GitHub.")
 
-# Save the preprocessing pipeline
-with open("preprocessing_pipeline.pkl", 'wb') as f:
-    pickle.dump(preprocessing_pipeline, f)
+# Replace with your GitHub repository details
+github_token = 'token'
+repo_path = 'kavyasri2099/Satellite_app'
+
+# Commit .pkl files to GitHub
+commit_to_github(repo_path, github_token, model_files)
