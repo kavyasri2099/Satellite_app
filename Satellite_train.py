@@ -1,72 +1,94 @@
 import os
-import pickle
 import numpy as np
+import pandas as pd
+from PIL import Image, ImageOps
+import warnings
+import pickle
+import time
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from PIL import Image
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import classification_report, accuracy_score
 
-# Function to load images and convert them to numpy arrays
-def load_images_from_folder(folder):
+warnings.filterwarnings('ignore')
+
+# Path to dataset
+data_path = "./"
+
+# Categories in the dataset
+categories = ["cloudy", "desert", "green_area", "water"]
+
+# Augmentation function
+def augment_image(image):
+    angle = np.random.uniform(-20, 20)  # Random rotation
+    image = image.rotate(angle)
+    if np.random.rand() > 0.5:  # Random horizontal flip
+        image = ImageOps.mirror(image)
+    return image
+
+# Convert to grayscale function
+def convert_to_grayscale(image):
+    return ImageOps.grayscale(image)
+
+# Process images and save to CSV
+def process_and_save_images(data_path, categories):
     images = []
-    for filename in os.listdir(folder):
-        img = Image.open(os.path.join(folder, filename))
-        if img is not None:
-            images.append(np.array(img).flatten())
-    return images
+    labels = []
+    for category in categories:
+        category_path = os.path.join(data_path, category)
+        label = categories.index(category)
+        for img_name in os.listdir(category_path):
+            img_path = os.path.join(category_path, img_name)
+            img = Image.open(img_path)
+            img = img.resize((128, 128))  # Resize images to a standard size
+            img = augment_image(img)  # Augmentation
+            img = convert_to_grayscale(img)  # Convert to grayscale
+            img_array = np.array(img).flatten()
+            images.append(img_array)
+            labels.append(label)
+    images = np.array(images)
+    labels = np.array(labels)
+    return images, labels
 
-# Path to data folders
-data_folders = ["cloudy", "desert", "green_area", "water"]
-base_path = os.path.dirname(os.path.abspath(__file__))
+images, labels = process_and_save_images(data_path, categories)
 
-# Load images and labels
-X = []
-y = []
-for idx, folder in enumerate(data_folders):
-    folder_path = os.path.join(base_path, "data", folder)
-    images = load_images_from_folder(folder_path)
-    X.extend(images)
-    y.extend([idx] * len(images))
+# Split the dataset
+X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
-# Convert lists to numpy arrays
-X = np.array(X)
-y = np.array(y)
-
-# Split data into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Define models
-models = {
-    "random_forest": RandomForestClassifier(random_state=42),
-    "decision_tree": DecisionTreeClassifier(random_state=42),
-    "k_nearest_neighbors": KNeighborsClassifier(),
-    "support_vector_machine": SVC(random_state=42)
-}
-
-# Train models
-for model_name, model in models.items():
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"{model_name} Accuracy: {accuracy}")
-
-    # Save model as pickle file
-    model_filename = f"{model_name}_model.pkl"
-    with open(model_filename, 'wb') as f:
-        pickle.dump(model, f)
-
-# Save preprocessing pipeline (if needed)
+# Preprocessing pipeline
 preprocessing_pipeline = Pipeline([
     ('scaler', StandardScaler())
 ])
 
-preprocessing_filename = "preprocessing_pipeline.pkl"
-with open(preprocessing_filename, 'wb') as f:
-    pickle.dump(preprocessing_pipeline, f)
+X_train = preprocessing_pipeline.fit_transform(X_train)
+X_test = preprocessing_pipeline.transform(X_test)
 
-print("Models and preprocessing pipeline saved successfully.")
+# Train and save models
+models = {
+    "random_forest": RandomForestClassifier(n_estimators=100, max_features='sqrt'),
+    "decision_tree": DecisionTreeClassifier(),
+    "k_nearest_neighbors": KNeighborsClassifier(),
+    "support_vector_machine": SVC(kernel='linear')
+}
+
+for model_name, model in models.items():
+    start_time = time.time()
+    model.fit(X_train, y_train)
+    end_time = time.time()
+    y_pred = model.predict(X_test)
+
+    print(f"{model_name.replace('_', ' ').title()} Model")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+    print(classification_report(y_test, y_pred))
+    print(f"Training time: {end_time - start_time} seconds\n")
+
+    with open(f'{model_name}_model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+
+# Save the preprocessing pipeline
+with open('preprocessing_pipeline.pkl', 'wb') as f:
+    pickle.dump(preprocessing_pipeline, f)
