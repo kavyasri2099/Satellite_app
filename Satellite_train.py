@@ -18,7 +18,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # GitHub base URL for your data
-github_base_url = "https://github.com/kavyasri2099/Satellite_app/raw/main"
+github_base_url = "https://github.com/kavyasri2099/Satellite_app/main"
 
 # Categories in the dataset
 categories = ["cloudy", "desert", "green_area", "water"]
