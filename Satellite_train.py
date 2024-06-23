@@ -1,6 +1,4 @@
 import os
-import requests
-from io import BytesIO
 from PIL import Image, ImageOps
 import numpy as np
 import pandas as pd
@@ -17,9 +15,6 @@ from sklearn.metrics import classification_report, accuracy_score
 import warnings
 warnings.filterwarnings('ignore')
 
-# GitHub base URL for your data
-github_base_url = "https://raw.githubusercontent.com/kavyasri2099/Satellite_app/main"
-
 # Categories in the dataset
 categories = ["cloudy", "desert", "green_area", "water"]
 
@@ -34,25 +29,14 @@ def augment_image(image):
 def convert_to_grayscale(image):
     return ImageOps.grayscale(image)
 
-def download_and_process_images(github_base_url, categories):
+def process_images(data_path, categories):
     images, labels = [], []
     for category in categories:
-        category_url = f"{github_base_url}/{category}"
-        response = requests.get(category_url)
-        if response.status_code != 200:
-            print(f"Failed to retrieve {category} images.")
-            continue
-        category_files = response.text.split("\n")
-
+        category_path = os.path.join(data_path, category)
         label = categories.index(category)
-        for img_name in category_files:
-            if not img_name.strip():  # Skip empty lines
-                continue
-            img_url = f"{category_url}/{img_name.strip()}"
-            img_response = requests.get(img_url)
-            if img_response.status_code != 200:
-                continue
-            img = Image.open(BytesIO(img_response.content))
+        for img_name in os.listdir(category_path):
+            img_path = os.path.join(category_path, img_name)
+            img = Image.open(img_path)
             img = img.resize((128, 128))
             img = augment_image(img)
             img = convert_to_grayscale(img)
@@ -61,12 +45,15 @@ def download_and_process_images(github_base_url, categories):
             labels.append(label)
     return np.array(images), np.array(labels)
 
-# Download and process images
-images, labels = download_and_process_images(github_base_url, categories)
+# Data path where the folders are located
+data_path = "."
 
-# Check if any images were downloaded and processed
+# Process images
+images, labels = process_images(data_path, categories)
+
+# Check if any images were processed
 if images.size == 0 or labels.size == 0:
-    raise ValueError("No images or labels were downloaded and processed.")
+    raise ValueError("No images or labels were processed.")
 
 # Save processed images to CSV
 df = pd.DataFrame(images)
