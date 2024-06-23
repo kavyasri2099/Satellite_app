@@ -1,80 +1,99 @@
 import os
 import pickle
-import time
+from PIL import Image, ImageEnhance, ImageOps
 import numpy as np
-from sklearn.model_selection import train_test_split
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, classification_report
-from skimage.io import imread
-from skimage.transform import resize
-from numpy import array
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score
+import warnings
+warnings.filterwarnings('ignore')
 
-# Function to load images and labels
-def load_dataset(data_directory):
-    X = []
-    y = []
-    for class_name in os.listdir(data_directory):
-        class_dir = os.path.join(data_directory, class_name)
-        if os.path.isdir(class_dir):
-            for image_name in os.listdir(class_dir):
-                image_path = os.path.join(class_dir, image_name)
-                try:
-                    # Load and resize image to a common size if needed
-                    image = imread(image_path)
-                    image = resize(image, (100, 100))  # Resize images to 100x100 pixels
-                    X.append(image)
-                    y.append(class_name)
-                except Exception as e:
-                    print(f"Error loading image: {image_path}. Error: {e}")
-    return array(X), array(y)
+# Path to dataset
+data_path = "C:/Users/Kavya/data"
+categories = ["cloudy", "desert", "green_area", "water"]
 
-# Path to your dataset directory (replace with your GitHub repository path)
-data_dir = '/path/to/your/dataset'
+# Function to augment images
+def augment_image(image):
+    angle = np.random.uniform(-20, 20)
+    image = image.rotate(angle)
+    if np.random.rand() > 0.5:
+        image = ImageOps.mirror(image)
+    return image
 
-# Load dataset
-X, y = load_dataset(data_dir)
+def convert_to_grayscale(image):
+    return ImageOps.grayscale(image)
 
-# Split dataset into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+def process_images(data_path, categories):
+    images, labels = [], []
+    for category in categories:
+        category_path = os.path.join(data_path, category)
+        label = categories.index(category)
+        for img_name in os.listdir(category_path):
+            img_path = os.path.join(category_path, img_name)
+            img = Image.open(img_path)
+            img = img.resize((128, 128))
+            img = augment_image(img)
+            img = convert_to_grayscale(img)
+            img_array = np.array(img).flatten()
+            images.append(img_array)
+            labels.append(label)
+    return np.array(images), np.array(labels)
 
-# Define models
-models = {
-    'Random Forest': RandomForestClassifier(random_state=42),
-    'Decision Tree': DecisionTreeClassifier(random_state=42),
-    'K Nearest Neighbors': KNeighborsClassifier(),
-    'Support Vector Machine': SVC(random_state=42)
-}
+images, labels = process_images(data_path, categories)
+
+# Save processed images to CSV
+df = pd.DataFrame(images)
+df['label'] = labels
+df.to_csv("satellite_images.csv", index=False)
+
+# Split dataset
+X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
+
+# Preprocessing pipeline
+preprocessing_pipeline = Pipeline([('scaler', StandardScaler())])
+X_train = preprocessing_pipeline.fit_transform(X_train)
+X_test = preprocessing_pipeline.transform(X_test)
 
 # Train and save models
-for model_name, model in models.items():
-    start_time = time.time()
-    # If needed, preprocess your data here (e.g., flatten images, scale features)
-    model.fit(X_train.reshape(len(X_train), -1), y_train)
-    y_pred = model.predict(X_test.reshape(len(X_test), -1))
-    accuracy = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred)
+models = {
+    "RandomForest": RandomForestClassifier(),
+    "KNN": KNeighborsClassifier(),
+    "DecisionTree": DecisionTreeClassifier(),
+    "NaiveBayes": GaussianNB(),
+    "LogisticRegression": LogisticRegression(max_iter=1000)
+}
 
-    # Save model
-    model_filename = f'{model_name.lower().replace(" ", "_")}_model.pkl'
-    with open(model_filename, 'wb') as f:
-        pickle.dump(model, f)
-    
-    print(f"{model_filename} saved successfully.")
+params = {
+    "RandomForest": {'n_estimators': [50, 100, 200], 'max_features': ['auto', 'sqrt', 'log2']},
+    "KNN": {'n_neighbors': [3, 5, 7], 'weights': ['uniform', 'distance'], 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute']},
+    "DecisionTree": {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 'max_depth': [None, 10, 20, 30]},
+    "LogisticRegression": {'C': [0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
+}
 
-    # Print evaluation metrics
-    print(f"\n{model_name} Model\n")
-    print(f"Accuracy: {accuracy:.2f}\n")
-    print(report)
-    print(f"Training time: {time.time() - start_time} seconds\n")
+for model_name in models:
+    if model_name in params:
+        grid_search = GridSearchCV(models[model_name], params[model_name], cv=3, verbose=1)
+        grid_search.fit(X_train, y_train)
+        best_model = grid_search.best_estimator_
+    else:
+        models[model_name].fit(X_train, y_train)
+        best_model = models[model_name]
+    with open(f"{model_name.lower()}_model.pkl", 'wb') as f:
+        pickle.dump(best_model, f)
+    y_pred = best_model.predict(X_test)
+    print(f"{model_name} Model")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+    print(classification_report(y_test, y_pred))
 
-# Save preprocessing pipeline (if applicable)
-# Example: Scaling images or feature extraction
-# preprocessing_pipeline = Pipeline([('scaler', StandardScaler())])
-# preprocessing_pipeline.fit(X_train.reshape(len(X_train), -1))
-# with open('preprocessing_pipeline.pkl', 'wb') as f:
-#     pickle.dump(preprocessing_pipeline, f)
-
-print("\nTraining script has been successfully completed.")
+# Save preprocessing pipeline
+with open("preprocessing_pipeline.pkl", 'wb') as f:
+    pickle.dump(preprocessing_pipeline, f)
