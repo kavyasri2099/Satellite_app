@@ -1,94 +1,77 @@
-# Import necessary libraries
 import os
 import numpy as np
-from PIL import Image, ImageEnhance, ImageOps
 import pandas as pd
+from PIL import Image, ImageOps, ImageEnhance
 import pickle
-import time
-import seaborn as sns
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
-
-# Suppress warnings
-import warnings
-warnings.filterwarnings('ignore')
-
-# Define functions for image augmentation, brightness adjustment, and grayscale conversion
-def augment_image(image):
-    angle = np.random.uniform(-20, 20)  # Random rotation
-    image = image.rotate(angle)
-    if np.random.rand() > 0.5:  # Random horizontal flip
-        image = ImageOps.mirror(image)
-    return image
-
-def adjust_brightness(image, factor):
-    enhancer = ImageEnhance.Brightness(image)
-    return enhancer.enhance(factor)
-
-def convert_to_grayscale(image):
-    return ImageOps.grayscale(image)
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Path to your dataset
-data_path = "C:/Users/Kavya/data"
+data_path = "data"
 
 # Categories in the dataset
 categories = ["cloudy", "desert", "green_area", "water"]
 
-# Function to preprocess images, extract features, and save to CSV
-def process_and_save_images(data_path, categories):
+# Function to load and preprocess images
+def load_and_preprocess_images(data_path, categories):
     images = []
     labels = []
 
-    for category in categories:
+    for category_id, category in enumerate(categories):
         category_path = os.path.join(data_path, category)
-        label = categories.index(category)
-        
-        for img_name in os.listdir(category_path):
-            img_path = os.path.join(category_path, img_name)
-            img = Image.open(img_path)
-            img = img.resize((128, 128))  # Resize images to a standard size
-            
-            img = augment_image(img)  # Augmentation
-            img = convert_to_grayscale(img)  # Convert to grayscale
-            
-            img_array = np.array(img).flatten()  # Flatten image array
-            images.append(img_array)
-            labels.append(label)
+        for file_name in os.listdir(category_path):
+            image_path = os.path.join(category_path, file_name)
+            image = Image.open(image_path)
+            image = image.resize((128, 128))  # Resize images to a standard size
 
-    images = np.array(images)
-    labels = np.array(labels)
+            # Data augmentation: random rotation and horizontal flip
+            angle = np.random.uniform(-20, 20)
+            image = image.rotate(angle)
+            if np.random.rand() > 0.5:
+                image = ImageOps.mirror(image)
 
-    # Save images and labels to CSV
-    df = pd.DataFrame(images)
-    df['label'] = labels
-    df.to_csv("satellite_images.csv", index=False)
+            # Convert to grayscale
+            image = ImageOps.grayscale(image)
 
-    return images, labels
+            # Convert image to numpy array and flatten
+            image_array = np.array(image).flatten()
 
-# Preprocess images and save to CSV
-images, labels = process_and_save_images(data_path, categories)
+            # Append image array and label to lists
+            images.append(image_array)
+            labels.append(category_id)
+
+    return np.array(images), np.array(labels)
+
+# Load and preprocess images
+images, labels = load_and_preprocess_images(data_path, categories)
+
+# Save preprocessed images and labels to CSV
+df = pd.DataFrame(images)
+df['label'] = labels
+df.to_csv("satellite_images.csv", index=False)
 
 # Split dataset into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
-# Define preprocessing pipeline (in this case, StandardScaler)
+# Define preprocessing pipeline
 preprocessing_pipeline = Pipeline([
     ('scaler', StandardScaler())
 ])
 
-# Fit preprocessing pipeline on training data and transform both training and testing data
+# Apply preprocessing pipeline to training and testing sets
 X_train = preprocessing_pipeline.fit_transform(X_train)
 X_test = preprocessing_pipeline.transform(X_test)
 
-# Define machine learning models
+# Define models
 models = {
     'Random Forest': RandomForestClassifier(),
     'KNN': KNeighborsClassifier(),
@@ -97,49 +80,34 @@ models = {
     'Logistic Regression': LogisticRegression(max_iter=1000)
 }
 
-# Dictionary to store best models
-best_models = {}
+# Train models and evaluate performance
+for model_name, model in models.items():
+    print(f"Training {model_name}...")
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"{model_name} Accuracy: {accuracy:.4f}")
+    print(classification_report(y_test, y_pred))
+    print()
 
-# Function to train models, perform GridSearchCV, evaluate performance, and save best models
-def train_models(models, X_train, X_test, y_train, y_test):
-    for name, model in models.items():
-        print(f"Training {name} model...")
-        
-        if name == 'Random Forest':
-            params = {'n_estimators': [50, 100, 200], 'max_features': ['auto', 'sqrt', 'log2']}
-        elif name == 'KNN':
-            params = {'n_neighbors': [3, 5, 7], 'weights': ['uniform', 'distance'], 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute']}
-        elif name == 'Decision Tree':
-            params = {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'], 'max_depth': [None, 10, 20, 30]}
-        elif name == 'Logistic Regression':
-            params = {'C': [0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
-        else:
-            params = {}
-        
-        grid_search = GridSearchCV(model, params, cv=3, verbose=1)
-        
-        start_time = time.time()
-        grid_search.fit(X_train, y_train)
-        end_time = time.time()
-        
-        best_model = grid_search.best_estimator_
-        best_models[name] = best_model
-        
-        y_pred = best_model.predict(X_test)
-        
-        print(f"Best Parameters: {grid_search.best_params_}")
-        print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
-        print(classification_report(y_test, y_pred))
-        print(f"Training time: {end_time - start_time} seconds")
-        
-        # Save best model using pickle
-        with open(f'{name.lower().replace(" ", "_")}_model.pkl', 'wb') as f:
-            pickle.dump(best_model, f)
-        
-        print(f"{name} model saved successfully.\n")
+    # Save the best model using pickle
+    pickle.dump(model, open(f"{model_name.lower().replace(' ', '_')}_model.pkl", 'wb'))
 
-# Train models
-train_models(models, X_train, X_test, y_train, y_test)
+    # Plot confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    plt.figure(figsize=(5, 4))
+    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', cbar=False)
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title(f'Confusion Matrix - {model_name}')
+    plt.savefig(f"confusion_matrix_{model_name.lower().replace(' ', '_')}.png")
+    plt.show()
+
+    # Clear plot to avoid overlapping in loop
+    plt.clf()
+
+# Save preprocessing pipeline using pickle
+pickle.dump(preprocessing_pipeline, open('preprocessing_pipeline.pkl', 'wb'))
 
 # Visualize count plot of categories
 sns.countplot(x=labels, palette="viridis")
@@ -147,6 +115,5 @@ plt.xticks(ticks=np.arange(len(categories)), labels=categories)
 plt.xlabel('Category')
 plt.ylabel('Count')
 plt.title('Distribution of Satellite Image Categories')
+plt.savefig('count_plot.png')
 plt.show()
-
-print("Training and saving models completed successfully.")
