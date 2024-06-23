@@ -15,21 +15,20 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Path to your dataset
-data_path = "data"
-
-# Categories in the dataset
-categories = ["cloudy", "desert", "green_area", "water"]
+# Path to your dataset folders directly containing images
+cloudy_path = "cloudy"
+desert_path = "desert"
+green_area_path = "green_area"
+water_path = "water"
 
 # Function to load and preprocess images
-def load_and_preprocess_images(data_path, categories):
+def load_and_preprocess_images(paths):
     images = []
     labels = []
 
-    for category_id, category in enumerate(categories):
-        category_path = os.path.join(data_path, category)
-        for file_name in os.listdir(category_path):
-            image_path = os.path.join(category_path, file_name)
+    for category_id, path in enumerate(paths):
+        for file_name in os.listdir(path):
+            image_path = os.path.join(path, file_name)
             image = Image.open(image_path)
             image = image.resize((128, 128))  # Resize images to a standard size
 
@@ -52,7 +51,7 @@ def load_and_preprocess_images(data_path, categories):
     return np.array(images), np.array(labels)
 
 # Load and preprocess images
-images, labels = load_and_preprocess_images(data_path, categories)
+images, labels = load_and_preprocess_images([cloudy_path, desert_path, green_area_path, water_path])
 
 # Save preprocessed images and labels to CSV
 df = pd.DataFrame(images)
@@ -111,7 +110,7 @@ pickle.dump(preprocessing_pipeline, open('preprocessing_pipeline.pkl', 'wb'))
 
 # Visualize count plot of categories
 sns.countplot(x=labels, palette="viridis")
-plt.xticks(ticks=np.arange(len(categories)), labels=categories)
+plt.xticks(ticks=np.arange(4), labels=['cloudy', 'desert', 'green_area', 'water'])
 plt.xlabel('Category')
 plt.ylabel('Count')
 plt.title('Distribution of Satellite Image Categories')
