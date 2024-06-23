@@ -1,17 +1,21 @@
 import streamlit as st
 from PIL import Image, ImageOps
 import numpy as np
-import os
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 import pickle
+import os
 
 # Load your trained model
-@st.cache(allow_output_mutation=True)
+@st.cache_resource
 def load_model():
-    with open("best_model.pkl", "rb") as file:
-        model = pickle.load(file)
+    try:
+        with open("best_model.pkl", "rb") as file:
+            model = pickle.load(file)
+    except FileNotFoundError:
+        st.error("Model file not found. Please make sure 'best_model.pkl' is in the directory.")
+        model = None
     return model
 
 # Load the model
@@ -44,19 +48,23 @@ if uploaded_file is not None:
     scaler = StandardScaler()
     processed_image = scaler.fit_transform(processed_image)
     
-    # Predict the category
-    categories = ["cloudy", "desert", "green_area", "water"]
-    prediction = model.predict(processed_image)
-    predicted_category = categories[prediction[0]]
-    
-    # Display the prediction
-    st.write(f"The model predicts this image is: **{predicted_category}**")
+    # Predict the category if the model is loaded
+    if model is not None:
+        categories = ["cloudy", "desert", "green_area", "water"]
+        prediction = model.predict(processed_image)
+        predicted_category = categories[prediction[0]]
+        
+        # Display the prediction
+        st.write(f"The model predicts this image is: **{predicted_category}**")
 
 # Plotting the distribution of categories (if desired)
 if st.checkbox("Show category distribution"):
-    # Assuming you saved the DataFrame with images and labels
-    df = pd.read_csv("satellite_images.csv")
-    
-    # Display the count plot
-    st.subheader("Category Distribution in the Dataset")
-    st.bar_chart(df['label'].value_counts())
+    try:
+        # Assuming you saved the DataFrame with images and labels
+        df = pd.read_csv("satellite_images.csv")
+        
+        # Display the count plot
+        st.subheader("Category Distribution in the Dataset")
+        st.bar_chart(df['label'].value_counts())
+    except FileNotFoundError:
+        st.error("Dataset file not found. Please make sure 'satellite_images.csv' is in the directory.")
