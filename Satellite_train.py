@@ -61,7 +61,12 @@ def download_and_process_images(github_base_url, categories):
             labels.append(label)
     return np.array(images), np.array(labels)
 
+# Download and process images
 images, labels = download_and_process_images(github_base_url, categories)
+
+# Check if any images were downloaded and processed
+if images.size == 0 or labels.size == 0:
+    raise ValueError("No images or labels were downloaded and processed.")
 
 # Save processed images to CSV
 df = pd.DataFrame(images)
