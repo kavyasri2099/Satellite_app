@@ -1,6 +1,8 @@
 import streamlit as st
-import pickle
 import os
+import pickle
+from skimage.io import imread
+from skimage.transform import resize
 
 # Function to load models
 def load_models(model_files):
@@ -14,9 +16,13 @@ def load_models(model_files):
             st.stop()
     return models
 
+# Function to load an image
+def load_image(image_file):
+    return imread(image_file)
+
 # Main Streamlit app code
 def main():
-    st.title("Machine Learning Models Demo")
+    st.title("Image Classification Demo")
     
     # Check current directory and list files
     st.subheader("Current Directory Contents:")
@@ -34,23 +40,25 @@ def main():
 
     # Load models
     models = load_models(model_files)
-    
-    # Load preprocessing pipeline
-    try:
-        with open('preprocessing_pipeline.pkl', 'rb') as f:
-            preprocessing_pipeline = pickle.load(f)
-    except FileNotFoundError:
-        st.error("Preprocessing pipeline file 'preprocessing_pipeline.pkl' not found. Please ensure that the file exists and the path is correct.")
-        st.stop()
-    
-    # Display loaded models and preprocessing pipeline details
-    st.subheader("Loaded Models:")
-    for model_name, model in models.items():
-        st.write(f"Model: {model_name}")
-        st.write(model)
 
-    st.subheader("Preprocessing Pipeline:")
-    st.write(preprocessing_pipeline)
+    # File uploader for image input
+    st.subheader("Upload Image for Classification")
+    uploaded_file = st.file_uploader("Choose an image...", type=['jpg', 'png', 'jpeg'])
+    
+    if uploaded_file is not None:
+        # Display uploaded image
+        st.image(uploaded_file, caption='Uploaded Image.', use_column_width=True)
+        
+        # Load and preprocess image (if needed)
+        image = imread(uploaded_file)
+        image = resize(image, (100, 100))  # Resize image to match training data size
+        
+        # Make predictions
+        st.subheader("Prediction Results:")
+        for model_name, model in models.items():
+            prediction = model.predict(image.reshape(1, -1))[0]
+            st.write(f"Model: {model_name}")
+            st.write(f"Prediction: {prediction}")
 
 # Run the main function
 if __name__ == '__main__':
