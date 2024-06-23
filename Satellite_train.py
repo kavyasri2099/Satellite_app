@@ -1,7 +1,7 @@
 import os
 import requests
 from io import BytesIO
-from PIL import Image, ImageEnhance, ImageOps
+from PIL import Image, ImageOps
 import numpy as np
 import pandas as pd
 import pickle
@@ -18,7 +18,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # GitHub base URL for your data
-github_base_url = "https://github.com/kavyasri2099/Satellite_app/main"
+github_base_url = "https://raw.githubusercontent.com/kavyasri2099/Satellite_app/main"
 
 # Categories in the dataset
 categories = ["cloudy", "desert", "green_area", "water"]
@@ -35,17 +35,23 @@ def convert_to_grayscale(image):
     return ImageOps.grayscale(image)
 
 def download_and_process_images(github_base_url, categories):
-    images, labels = []
+    images, labels = [], []
     for category in categories:
         category_url = f"{github_base_url}/{category}"
         response = requests.get(category_url)
-        response.raise_for_status()
-        category_files = response.json()
+        if response.status_code != 200:
+            print(f"Failed to retrieve {category} images.")
+            continue
+        category_files = response.text.split("\n")
 
         label = categories.index(category)
         for img_name in category_files:
-            img_url = f"{category_url}/{img_name}"
+            if not img_name.strip():  # Skip empty lines
+                continue
+            img_url = f"{category_url}/{img_name.strip()}"
             img_response = requests.get(img_url)
+            if img_response.status_code != 200:
+                continue
             img = Image.open(BytesIO(img_response.content))
             img = img.resize((128, 128))
             img = augment_image(img)
@@ -86,21 +92,32 @@ params = {
     "LogisticRegression": {'C': [0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
 }
 
+best_accuracy = 0
+best_model_name = ""
+best_model = None
+
 for model_name in models:
+    print(f"Training {model_name}...")
     if model_name in params:
         grid_search = GridSearchCV(models[model_name], params[model_name], cv=3, verbose=1)
         grid_search.fit(X_train, y_train)
-        best_model = grid_search.best_estimator_
+        model = grid_search.best_estimator_
     else:
         models[model_name].fit(X_train, y_train)
-        best_model = models[model_name]
-    with open(f"{model_name.lower()}_model.pkl", 'wb') as f:
-        pickle.dump(best_model, f)
-    y_pred = best_model.predict(X_test)
-    print(f"{model_name} Model")
-    print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+        model = models[model_name]
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"{model_name} Accuracy: {accuracy}")
     print(classification_report(y_test, y_pred))
+    with open(f"{model_name.lower()}_model.pkl", 'wb') as f:
+        pickle.dump(model, f)
+    if accuracy > best_accuracy:
+        best_accuracy = accuracy
+        best_model_name = model_name
+        best_model = model
 
-# Save preprocessing pipeline
+print(f"Best model: {best_model_name} with accuracy {best_accuracy}")
+
+# Save the preprocessing pipeline
 with open("preprocessing_pipeline.pkl", 'wb') as f:
     pickle.dump(preprocessing_pipeline, f)
