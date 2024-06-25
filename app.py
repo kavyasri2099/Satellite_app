@@ -20,19 +20,6 @@ def preprocess_image(image):
     img_array = preprocessing_pipeline.transform(img_array)
     return img_array
 
-# Function to fetch a random wallpaper
-def fetch_wallpaper():
-    url = "https://source.unsplash.com/random/1600x900"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.content
-        else:
-            return None
-    except Exception as e:
-        st.error(f"Error fetching wallpaper: {e}")
-        return None
-
 # Streamlit app settings
 st.set_page_config(
     page_title="Satellite Image Classification App",
@@ -41,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS styles for modern design
+# CSS styles for modern design and animations
 st.markdown(
     """
     <style>
@@ -63,23 +50,25 @@ st.markdown(
         position: absolute;
         width: 60px;
         height: auto;
-        z-index: 1;
-        animation: satelliteAnimation 10s linear infinite alternate;
+        top: 20px;
+        left: 20px;
+        animation: satelliteAnimation 8s ease-in-out infinite alternate;
     }
     @keyframes satelliteAnimation {
-        0% { transform: translateY(0px); }
-        100% { transform: translateY(-20px); }
+        0% { transform: translateX(-20px) rotate(0deg); }
+        100% { transform: translateX(20px) rotate(360deg); }
     }
     .star {
         position: absolute;
         width: 20px;
         height: auto;
-        z-index: 1;
-        animation: starAnimation 8s linear infinite alternate;
+        top: 50px;
+        right: 50px;
+        animation: starAnimation 6s ease-in-out infinite alternate;
     }
     @keyframes starAnimation {
-        0% { transform: translateY(0px); }
-        100% { transform: translateY(-10px); }
+        0% { transform: translateY(0px) rotate(0deg); }
+        100% { transform: translateY(-10px) rotate(360deg); }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -87,8 +76,8 @@ st.markdown(
 # App title with emoji and animated satellite/star images
 st.markdown('''
     <h1 class="title">🛰️ Satellite Image Classification App <span class="emoji">🌍</span></h1>
-    <img class="satellite" src="https://example.com/satellite.png" alt="Satellite">
-    <img class="star" src="https://example.com/star.png" alt="Star">
+    <img class="satellite" src="https://github.com/kavyasri2099/Satellite_app/blob/main/assets/Background.jpg" alt="Satellite">
+    <img class="star" src="https://github.com/kavyasri2099/Satellite_app/blob/main/assets/Background.jpg" alt="Star">
     ''', unsafe_allow_html=True)
 
 # Description
