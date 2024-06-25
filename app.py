@@ -3,6 +3,9 @@ import numpy as np
 from PIL import Image, ImageOps
 import pickle
 import requests
+from io import BytesIO
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 # Load the model and preprocessing pipeline
 with open('rf_model.pkl', 'rb') as model_file:
@@ -27,12 +30,27 @@ def fetch_wallpaper():
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            return response.url
+            return response.content
         else:
             return None
     except Exception as e:
         st.error(f"Error fetching wallpaper: {e}")
         return None
+
+# Function to create animated sparkles effect
+def animate_sparkles():
+    fig, ax = plt.subplots()
+    ax.set_facecolor('black')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    scat = ax.scatter([], [], s=150, color='gold', alpha=0.6)
+
+    def update(frame):
+        scat.set_offsets(np.random.rand(10, 2))
+        return scat,
+
+    ani = animation.FuncAnimation(fig, update, frames=range(100), interval=100)
+    return ani.to_jshtml()
 
 # Streamlit app settings
 st.set_page_config(
@@ -42,19 +60,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# App title and description
-st.title("Satellite Image Classification App")
+# App title and description with sparkles effect
+st.title("🛰️ Satellite Image Classification App 🌍")
 st.markdown(
     "Upload an image, and the model will classify it into one of the following categories: Cloudy, Desert, Green Area, Water"
 )
 
-# Sidebar with wallpaper and other widgets
-st.sidebar.title("Customize Your Experience")
-wallpaper_url = fetch_wallpaper()
-if wallpaper_url:
-    st.sidebar.image(wallpaper_url, caption="Wallpaper", use_column_width=True)
-else:
-    st.sidebar.warning("Failed to load wallpaper. Check your internet connection.")
+# Sidebar with animated sparkles and other widgets
+st.sidebar.title("Customize Your Experience ✨")
+st.sidebar.markdown(animate_sparkles(), unsafe_allow_html=True)
 
 # File uploader for image selection
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
@@ -71,16 +85,16 @@ if uploaded_file is not None:
         prediction = rf_model.predict(img_array)
         category = categories[prediction[0]]
 
-        # Display the prediction result
+        # Display the prediction result with animated text
         st.success(f"The image is classified as: **{category}**")
 
         # Additional interactive elements
         st.markdown("---")
-        st.subheader("Explore More")
+        st.subheader("Explore More 🌟")
         if st.button("Show Random Wallpaper"):
-            wallpaper_url = fetch_wallpaper()
-            if wallpaper_url:
-                st.image(wallpaper_url, caption="Random Wallpaper", use_column_width=True)
+            wallpaper_image = fetch_wallpaper()
+            if wallpaper_image:
+                st.image(wallpaper_image, caption="Random Wallpaper", use_column_width=True)
             else:
                 st.warning("Failed to load wallpaper. Please try again.")
 
