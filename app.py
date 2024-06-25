@@ -70,7 +70,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# App title with animation
+# Animated title
 st.markdown('<div class="title-container"><h1 class="title-text">🛰️ Satellite Image Classification App 🌍</h1></div>', unsafe_allow_html=True)
 
 # Description
