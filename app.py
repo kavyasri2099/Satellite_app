@@ -20,6 +20,19 @@ def preprocess_image(image):
     img_array = preprocessing_pipeline.transform(img_array)
     return img_array
 
+# Function to fetch a random wallpaper
+def fetch_wallpaper():
+    url = "https://source.unsplash.com/random/1600x900"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.content
+        else:
+            return None
+    except Exception as e:
+        st.error(f"Error fetching wallpaper: {e}")
+        return None
+
 # Streamlit app settings
 st.set_page_config(
     page_title="Satellite Image Classification App",
@@ -28,19 +41,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS styles for colorful theme and title
+# CSS styles for modern design
 st.markdown(
     """
     <style>
     .title {
         font-size: 3em;
-        padding: 10px;
+        padding: 20px;
         background-color: #00bfff; /* Colorful background */
         color: white;
         text-align: center;
         border-radius: 10px;
-        margin-bottom: 20px;
-        position: relative;
+        margin-bottom: 30px;
+        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
     }
     .emoji {
         font-size: 1.5em;
@@ -48,43 +61,34 @@ st.markdown(
     }
     .satellite {
         position: absolute;
-        width: 30px;
+        width: 60px;
         height: auto;
         z-index: 1;
+        animation: satelliteAnimation 10s linear infinite alternate;
+    }
+    @keyframes satelliteAnimation {
+        0% { transform: translateY(0px); }
+        100% { transform: translateY(-20px); }
     }
     .star {
         position: absolute;
-        width: 10px;
+        width: 20px;
         height: auto;
         z-index: 1;
+        animation: starAnimation 8s linear infinite alternate;
     }
-    .satellite1 {
-        top: 50px;
-        left: 20%;
-    }
-    .satellite2 {
-        top: 120px;
-        left: 70%;
-    }
-    .star1 {
-        top: 30px;
-        left: 30%;
-    }
-    .star2 {
-        top: 100px;
-        left: 60%;
+    @keyframes starAnimation {
+        0% { transform: translateY(0px); }
+        100% { transform: translateY(-10px); }
     }
     </style>
-    """
-    , unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# App title with emoji and satellite/star images
+# App title with emoji and animated satellite/star images
 st.markdown('''
     <h1 class="title">🛰️ Satellite Image Classification App <span class="emoji">🌍</span></h1>
-    <img class="satellite satellite1" src="https://example.com/satellite.png" alt="Satellite 1">
-    <img class="satellite satellite2" src="https://example.com/satellite.png" alt="Satellite 2">
-    <img class="star star1" src="https://example.com/star.png" alt="Star 1">
-    <img class="star star2" src="https://example.com/star.png" alt="Star 2">
+    <img class="satellite" src="https://example.com/satellite.png" alt="Satellite">
+    <img class="star" src="https://example.com/star.png" alt="Star">
     ''', unsafe_allow_html=True)
 
 # Description
