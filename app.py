@@ -1,11 +1,23 @@
 import streamlit as st
-import numpy as np
-from PIL import Image, ImageOps
-import pickle
 import requests
 from io import BytesIO
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from PIL import Image
+import numpy as np
+import pickle
+
+# Function to fetch the background image
+def fetch_background_image():
+    url = "https://github.com/kavyasri2099/Satellite_app/raw/main/assets/Background.jpg"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return Image.open(BytesIO(response.content))
+        else:
+            st.warning("Failed to load background image.")
+            return None
+    except Exception as e:
+        st.error(f"Error fetching background image: {e}")
+        return None
 
 # Load the model and preprocessing pipeline
 with open('rf_model.pkl', 'rb') as model_file:
@@ -19,38 +31,60 @@ categories = ["Cloudy", "Desert", "Green Area", "Water"]
 # Function to preprocess the uploaded image
 def preprocess_image(image):
     image = image.resize((128, 128))
-    image = ImageOps.grayscale(image)
     img_array = np.array(image).flatten().reshape(1, -1)
     img_array = preprocessing_pipeline.transform(img_array)
     return img_array
 
-# Function to fetch a random wallpaper
-def fetch_wallpaper():
-    url = "https://source.unsplash.com/random/1600x900"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.content
-        else:
-            return None
-    except Exception as e:
-        st.error(f"Error fetching wallpaper: {e}")
-        return None
+# Function to classify the image
+def classify_image(image):
+    img_array = preprocess_image(image)
+    prediction = rf_model.predict(img_array)
+    return categories[prediction[0]]
 
-# Function to create animated sparkles effect
-def animate_sparkles():
-    fig, ax = plt.subplots()
-    ax.set_facecolor('black')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    scat = ax.scatter([], [], s=150, color='gold', alpha=0.6)
+# Function to add snow effect using JavaScript and CSS
+def snow_effect():
+    return """
+    <style>
+    body {
+        overflow-x: hidden;
+    }
+    .snowflake {
+        position: absolute;
+        user-select: none;
+        pointer-events: none;
+        z-index: 1000;
+        color: #fff;
+        font-size: 2em;
+        animation: snow linear infinite;
+        transform: translate3d(0, -100%, 0);
+    }
+    @keyframes snow {
+        0% {
+            transform: translate3d(0, -100%, 0);
+        }
+        100% {
+            transform: translate3d(100vw, 100vh, 0);
+        }
+    }
+    </style>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const numFlakes = 30;
+        const flakesContainer = document.createElement('div');
+        flakesContainer.className = 'snowflake-container';
+        document.body.appendChild(flakesContainer);
 
-    def update(frame):
-        scat.set_offsets(np.random.rand(10, 2))
-        return scat,
-
-    ani = animation.FuncAnimation(fig, update, frames=range(100), interval=100)
-    return ani.to_jshtml()
+        for (let i = 0; i < numFlakes; i++) {
+            const snowflake = document.createElement('div');
+            snowflake.className = 'snowflake';
+            snowflake.innerHTML = '&bull;';
+            snowflake.style.left = Math.random() * 100 + 'vw';
+            snowflake.style.animationDuration = (Math.random() * 3 + 3) + 's';
+            flakesContainer.appendChild(snowflake);
+        }
+    });
+    </script>
+    """
 
 # Streamlit app settings
 st.set_page_config(
@@ -60,15 +94,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# App title and description with sparkles effect
+# App title and description
 st.title("🛰️ Satellite Image Classification App 🌍")
 st.markdown(
     "Upload an image, and the model will classify it into one of the following categories: Cloudy, Desert, Green Area, Water"
 )
 
-# Sidebar with animated sparkles and other widgets
-st.sidebar.title("Customize Your Experience ✨")
-st.sidebar.markdown(animate_sparkles(), unsafe_allow_html=True)
+# Fetch and display background image
+background_image = fetch_background_image()
+if background_image:
+    st.image(background_image, use_column_width=True)
 
 # File uploader for image selection
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
@@ -80,23 +115,14 @@ if uploaded_file is not None:
         st.write("")
         st.write("Classifying...")
 
-        # Preprocess the image and make a prediction
-        img_array = preprocess_image(image)
-        prediction = rf_model.predict(img_array)
-        category = categories[prediction[0]]
+        # Classify the image
+        prediction = classify_image(image)
 
-        # Display the prediction result with animated text
-        st.success(f"The image is classified as: **{category}**")
+        # Display the prediction result
+        st.success(f"The image is classified as: **{prediction}**")
 
-        # Additional interactive elements
-        st.markdown("---")
-        st.subheader("Explore More 🌟")
-        if st.button("Show Random Wallpaper"):
-            wallpaper_image = fetch_wallpaper()
-            if wallpaper_image:
-                st.image(wallpaper_image, caption="Random Wallpaper", use_column_width=True)
-            else:
-                st.warning("Failed to load wallpaper. Please try again.")
+        # Display snow effect after prediction result
+        st.markdown(snow_effect(), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
