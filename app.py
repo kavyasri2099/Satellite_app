@@ -28,59 +28,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS styles for modern design and animations
-st.markdown(
-    """
-    <style>
-    .title {
-        font-size: 3em;
-        padding: 20px;
-        background-color: #00bfff; /* Colorful background */
-        color: white;
-        text-align: center;
-        border-radius: 10px;
-        margin-bottom: 30px;
-        box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-    }
-    .emoji {
-        font-size: 1.5em;
-        margin-left: 10px;
-    }
-    .satellite {
-        position: absolute;
-        width: 60px;
-        height: auto;
-        top: 20px;
-        left: 20px;
-        animation: satelliteAnimation 8s ease-in-out infinite alternate;
-    }
-    @keyframes satelliteAnimation {
-        0% { transform: translateX(-20px) rotate(0deg); }
-        100% { transform: translateX(20px) rotate(360deg); }
-    }
-    .star {
-        position: absolute;
-        width: 20px;
-        height: auto;
-        top: 50px;
-        right: 50px;
-        animation: starAnimation 6s ease-in-out infinite alternate;
-    }
-    @keyframes starAnimation {
-        0% { transform: translateY(0px) rotate(0deg); }
-        100% { transform: translateY(-10px) rotate(360deg); }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# App title with emoji and animated satellite/star images
-st.markdown('''
-    <h1 class="title">🛰️ Satellite Image Classification App <span class="emoji">🌍</span></h1>
-    <img class="satellite" src="https://github.com/kavyasri2099/Satellite_app/blob/main/assets/Background.jpg" alt="Satellite">
-    <img class="star" src="https://github.com/kavyasri2099/Satellite_app/blob/main/assets/Background.jpg" alt="Star">
-    ''', unsafe_allow_html=True)
-
-# Description
+# App title and description
+st.title("Satellite Image Classification App")
 st.write("Upload an image, and the model will classify it into one of the following categories: Cloudy, Desert, Green Area, Water")
 
 # File uploader for image selection
@@ -98,8 +47,8 @@ if uploaded_file is not None:
         prediction = rf_model.predict(img_array)
         category = categories[prediction[0]]
         
-        # Display the prediction result with emoji
-        st.success(f"The image is classified as: **{category.capitalize()}** 🎉")
+        # Display the prediction result
+        st.success(f"The image is classified as: {category.capitalize()}")
         
     except Exception as e:
         st.error(f"An error occurred: {e}")
